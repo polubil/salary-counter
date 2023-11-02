@@ -43,5 +43,5 @@ def setup_bot_handlers(dp: Dispatcher, database):
         except json.JSONDecodeError:
             await message.answer(error_message)
         except Exception as e:
-            tb_logger.log_info(f"Error in fetch_data: {str(e)}")
+            tb_logger.log_info(f"Error in fetch_data: {e}")
             await message.answer("Произошла ошибка при выполнении запроса.")

@@ -9,7 +9,6 @@ from src.mongo.mongo import Mongo
 from src.bot.bot import setup_bot_handlers
 
 TOKEN = os.environ.get("TOKEN")
-
 MONGO_USERNAME = os.environ.get("MONGO_USERNAME")
 MONGO_PASSWORD = os.environ.get("MONGO_PASSWORD")
 MONGO_CLUSTER = os.environ.get("MONGO_CLUSTER")
@@ -23,7 +22,7 @@ update_db = os.environ.get("UPDATE_DB")
 if None in [MONGO_USERNAME, MONGO_PASSWORD, MONGO_CLUSTER, DATABASE_NAME, COLLECTION_NAME]:
     raise ValueError("Отсутствуют данные для подключения к базе данных.")
 if TOKEN is None:
-    raise Exception("where is token?")
+    raise Exception("Отсутствует токен бота.")
 
 
 async def main():

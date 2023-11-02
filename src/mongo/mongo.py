@@ -44,7 +44,7 @@ class Mongo:
             )
             tb_logger.log_info("MongoDB connected.")
         except errors.PyMongoError as e:
-            tb_logger.log_info("Не удалось подключиться к базе данных:", e)
+            tb_logger.log_info(f"Не удалось подключиться к базе данных: {e}")
             sys.exit(1)
         return client
 
@@ -54,7 +54,7 @@ class Mongo:
         :return: Amount documents in the collection
         """
         documents_amount = await self.collection.count_documents({})
-        tb_logger.log_info("Total documents amount:", documents_amount)
+        tb_logger.log_info(f"Total documents amount: {documents_amount}")
         return documents_amount
 
     async def import_bson_to_db(self, path_to_bson: str) -> bool:
@@ -70,9 +70,9 @@ class Mongo:
                 tb_logger.log_info(f"Inserted {len(result.inserted_ids)} docs.")
                 return True
         except FileNotFoundError as e:
-            tb_logger.log_info("BSON файл не найден:", e)
+            tb_logger.log_info(f"BSON файл не найден: {e}")
         except Exception as e:
-            tb_logger.log_info("Произошла ошибка:", e)
+            tb_logger.log_info(f"Произошла ошибка: {e}")
         return False
 
     async def create_index(self, field: str = "dt") -> None:
@@ -88,7 +88,7 @@ class Mongo:
             try:
                 await self.collection.create_index(field)
             except Exception as e:
-                tb_logger.log_info(f"Не удалось создать индекс для ключа {field}:", e)
+                tb_logger.log_info(f"Не удалось создать индекс для ключа {field}: {e}")
 
     async def get_data_from_db(self, input_data: dict[str, str]) -> dict[str, list[int] | str]:
         """
@@ -105,18 +105,33 @@ class Mongo:
         """
         # this dict used to format "labels" in the returning dict
         group_format = {
-            "hour": "%Y-%m-%d-%H",
+            "hour": "%Y-%m-%dT%H",
             "day": "%Y-%m-%d",
             "month": "%Y-%m",
         }
 
         start_date = datetime.datetime.fromisoformat(input_data["dt_from"])
         end_date = datetime.datetime.fromisoformat(input_data["dt_upto"])
-        date_format = group_format[input_data["group_type"]]
+        group_unit = input_data["group_type"]
+        date_format = group_format[group_unit]
 
         # pipeline with stages to aggregate data
         pipeline = [
             {"$match": {"dt": {"$gte": start_date, "$lte": end_date}}},
+            {
+                "$densify": {
+                    "field": "dt",
+                    "range": {
+                        "bounds": [
+                            start_date,
+                            end_date + datetime.timedelta(hours=1) if group_unit == "hour" else end_date
+                            # костыль исправить
+                        ],
+                        "step": 1,
+                        "unit": input_data["group_type"]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": {
@@ -125,7 +140,9 @@ class Mongo:
                             "date": "$dt"
                         },
                     },
-                    "summary": {"$sum": "$value"},
+                    "summary": {
+                        "$sum": {"$ifNull": ["$value", 0]},
+                    },
                 },
             },
             {"$sort": {"_id": 1}},
